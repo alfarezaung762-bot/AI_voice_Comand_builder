@@ -95,6 +95,7 @@ export default function ElevenLabsBulkPage() {
   const [downloadAsZip, setDownloadAsZip] = useState(false);
   const [saveLocally, setSaveLocally] = useState(true);
   const [languageCode, setLanguageCode] = useState("auto");
+  const [isCloud, setIsCloud] = useState(false);
 
   // Voice Settings override state
   const [overrideVoiceSettings, setOverrideVoiceSettings] = useState(false);
@@ -172,6 +173,14 @@ export default function ElevenLabsBulkPage() {
     const savedKey = localStorage.getItem("elevenlabs_custom_api_key");
     if (savedKey) {
       setApiKey(savedKey);
+    }
+    if (typeof window !== "undefined") {
+      const isLh = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      setIsCloud(!isLh);
+      if (!isLh) {
+        setDownloadAsZip(true);
+        setSaveLocally(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -836,37 +845,51 @@ export default function ElevenLabsBulkPage() {
               </div>
 
               {/* Output Directory Path */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+              <div className="space-y-2 pt-2 border-t border-slate-800/60">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Folder Penyimpanan (Komputer Sendiri)
+                  Folder Penyimpanan
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={outputPath}
-                    onChange={(e) => setOutputPath(e.target.value)}
-                    placeholder="Contoh: ./elevenlabs_outputs atau C:\ElevenLabs_Outputs"
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-200 font-medium"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSelectFolder}
-                    disabled={selectingFolder}
-                    className="bg-slate-900 border border-slate-800 text-indigo-400 hover:text-indigo-300 font-bold px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    {selectingFolder ? (
-                      <span>Membuka...</span>
-                    ) : (
-                      <>
-                        <span>📁</span>
-                        <span>Pilih Folder</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-500">
-                  Mendukung relative path (misal: <code>./outputs</code> untuk menyimpan di dalam folder project ini) atau absolute path (misal: <code>C:\HasilAudio</code> untuk Windows, atau <code>/Users/nama/Downloads</code> untuk Mac/Linux). Anda juga dapat mengeklik tombol <strong>Pilih Folder</strong> untuk memilih secara visual di Windows.
-                </p>
+                {isCloud ? (
+                  <div className="bg-indigo-950/40 border border-indigo-800/50 rounded-xl p-3 text-xs space-y-1 text-slate-300">
+                    <div className="font-bold text-indigo-300 flex items-center gap-1.5">
+                      <span>☁️</span>
+                      <span>Mode Cloud (Vercel) Aktif</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Karena Anda mengakses via Vercel, server tidak dapat mengakses disk lokal komputer Anda. File hasil generate akan otomatis diunduh sebagai satu paket <strong>ZIP</strong> langsung ke folder Downloads browser Anda.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={outputPath}
+                        onChange={(e) => setOutputPath(e.target.value)}
+                        placeholder="Contoh: ./elevenlabs_outputs atau C:\ElevenLabs_Outputs"
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-200 font-medium"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSelectFolder}
+                        disabled={selectingFolder}
+                        className="bg-slate-900 border border-slate-800 text-indigo-400 hover:text-indigo-300 font-bold px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {selectingFolder ? (
+                          <span>Membuka...</span>
+                        ) : (
+                          <>
+                            <span>📁</span>
+                            <span>Pilih Folder</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Mendukung relative path (misal: <code>./outputs</code> untuk menyimpan di dalam folder project ini) atau absolute path (misal: <code>C:\HasilAudio</code> untuk Windows, atau <code>/Users/nama/Downloads</code> untuk Mac/Linux). Anda juga dapat mengeklik tombol <strong>Pilih Folder</strong> untuk memilih secara visual di Windows.
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* API Key Override */}

@@ -215,6 +215,10 @@ export async function PUT(req: Request) {
       generationsPerVoice = 1
     } = body;
 
+    const isLocalWindows = process.platform === "win32";
+    const activeSaveLocally = isLocalWindows ? saveLocally : false;
+    const activeDownloadAsZip = isLocalWindows ? downloadAsZip : true;
+
     // Generate timestamp YYYYMMDD_HHmmss sekali di awal request bulk
     const now = new Date();
     const year = now.getFullYear();
@@ -243,7 +247,7 @@ export async function PUT(req: Request) {
 
     let targetDir = outputPath || "./elevenlabs_outputs";
     
-    if (saveLocally) {
+    if (activeSaveLocally) {
       // Konversi relative path menjadi absolute path berdasarkan root project
       if (!path.isAbsolute(targetDir)) {
         targetDir = path.resolve(process.cwd(), targetDir);
@@ -266,8 +270,8 @@ export async function PUT(req: Request) {
     const results = [];
     const ext = outputFormat.startsWith("wav") ? "wav" : "mp3";
 
-    // Inisialisasi ADM-ZIP jika downloadAsZip bernilai true
-    const zip = downloadAsZip ? new AdmZip() : null;
+    // Inisialisasi ADM-ZIP jika activeDownloadAsZip bernilai true
+    const zip = activeDownloadAsZip ? new AdmZip() : null;
 
     for (const voice of voices) {
       const { voiceId, name } = voice;
@@ -389,7 +393,7 @@ export async function PUT(req: Request) {
           const filename = `${safeText}_${langSuffix}_${safeModelName}_${timestamp}${takeSuffix}.${ext}`;
 
           let savedPath = undefined;
-          if (saveLocally) {
+          if (activeSaveLocally) {
             const finalPath = path.join(targetDir, filename);
             fs.writeFileSync(finalPath, finalBuffer);
             savedPath = finalPath;
