@@ -92,8 +92,8 @@ export default function ElevenLabsBulkPage() {
   const [outputFormat, setOutputFormat] = useState("wav_16000_mono");
   const [outputPath, setOutputPath] = useState("./elevenlabs_outputs");
   const [apiKey, setApiKey] = useState("");
-  const [downloadAsZip, setDownloadAsZip] = useState(true);
-  const [saveLocally, setSaveLocally] = useState(false);
+  const [downloadAsZip, setDownloadAsZip] = useState(false);
+  const [saveLocally, setSaveLocally] = useState(true);
   const [languageCode, setLanguageCode] = useState("auto");
 
   // Voice Settings override state
@@ -835,77 +835,39 @@ export default function ElevenLabsBulkPage() {
                 </p>
               </div>
 
-              {/* Target Penyimpanan Checkboxes */}
-              <div className="space-y-2 pt-2 border-t border-slate-800/60">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Tujuan Hasil Suara
-                </label>
-                <div className="flex flex-col gap-2 bg-slate-950/40 p-3 rounded-xl border border-slate-900">
-                  {/* Download as ZIP Checkbox */}
-                  <label className="flex items-center gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={downloadAsZip}
-                      onChange={(e) => setDownloadAsZip(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="text-xs">
-                      <div className="font-bold text-slate-200">Unduh Langsung (ZIP)</div>
-                      <div className="text-[10px] text-slate-400">Mengunduh file ZIP lewat browser Anda (memunculkan Save As).</div>
-                    </div>
-                  </label>
-
-                  {/* Save Locally Checkbox */}
-                  <label className="flex items-center gap-3 cursor-pointer select-none border-t border-slate-900 pt-2">
-                    <input
-                      type="checkbox"
-                      checked={saveLocally}
-                      onChange={(e) => setSaveLocally(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="text-xs">
-                      <div className="font-bold text-slate-200">Simpan di Server Proyek</div>
-                      <div className="text-[10px] text-slate-400">Menyimpan langsung di folder komputer lokal server Anda.</div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
               {/* Output Directory Path */}
-              {saveLocally && (
-                <div className="space-y-1.5 animate-fadeIn">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Folder Penyimpanan Server
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={outputPath}
-                      onChange={(e) => setOutputPath(e.target.value)}
-                      placeholder="Contoh: ./elevenlabs_outputs atau C:\ElevenLabs_Outputs"
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-200 font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSelectFolder}
-                      disabled={selectingFolder}
-                      className="bg-slate-900 border border-slate-800 text-indigo-400 hover:text-indigo-300 font-bold px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      {selectingFolder ? (
-                        <span>Membuka...</span>
-                      ) : (
-                        <>
-                          <span>📁</span>
-                          <span>Pilih Folder</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-500">
-                    Mendukung relative path (misal: <code>./outputs</code> untuk menyimpan di dalam folder project ini) atau absolute path (misal: <code>C:\HasilAudio</code> untuk Windows, atau <code>/Users/nama/Downloads</code> untuk Mac/Linux). Anda juga dapat mengeklik tombol <strong>Pilih Folder</strong> untuk memilih secara visual di Windows.
-                  </p>
+              <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Folder Penyimpanan (Komputer Sendiri)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={outputPath}
+                    onChange={(e) => setOutputPath(e.target.value)}
+                    placeholder="Contoh: ./elevenlabs_outputs atau C:\ElevenLabs_Outputs"
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-200 font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSelectFolder}
+                    disabled={selectingFolder}
+                    className="bg-slate-900 border border-slate-800 text-indigo-400 hover:text-indigo-300 font-bold px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {selectingFolder ? (
+                      <span>Membuka...</span>
+                    ) : (
+                      <>
+                        <span>📁</span>
+                        <span>Pilih Folder</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
+                <p className="text-[10px] text-slate-500">
+                  Mendukung relative path (misal: <code>./outputs</code> untuk menyimpan di dalam folder project ini) atau absolute path (misal: <code>C:\HasilAudio</code> untuk Windows, atau <code>/Users/nama/Downloads</code> untuk Mac/Linux). Anda juga dapat mengeklik tombol <strong>Pilih Folder</strong> untuk memilih secara visual di Windows.
+                </p>
+              </div>
 
               {/* API Key Override */}
               <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
