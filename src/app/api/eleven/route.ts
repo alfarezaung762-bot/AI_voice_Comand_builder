@@ -319,6 +319,8 @@ export async function PUT(req: Request) {
             }
           }
 
+          console.log(`[API ElevenLabs] Kirim payload ke ElevenLabs:`, JSON.stringify(reqPayload, null, 2));
+
           const response = await fetch(url, {
             method: "POST",
             headers: {

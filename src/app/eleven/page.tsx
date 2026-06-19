@@ -42,6 +42,49 @@ interface ElevenLabsVoiceResponse {
   description?: string;
 }
 
+const PRESET_COMBINATIONS = [
+  { no: 1, name: "Normal ID (Baseline)", stability: 0.60, clarity: 0.75, style: 0.00, speed: 1.00, languageCode: "id", desc: "Baseline suara normal dengan logat Indonesia standar." },
+  { no: 2, name: "Ekspresif ID", stability: 0.35, clarity: 0.60, style: 0.45, speed: 1.00, languageCode: "id", desc: "Intonasi dinamis, mirip cara bicara santai sehari-hari." },
+  { no: 3, name: "Aksen Inggris", stability: 0.55, clarity: 0.75, style: 0.10, speed: 1.00, languageCode: "en", desc: "Aksen barat (inggris-sentris) untuk variasi pelafalan huruf vokal." },
+  { no: 4, name: "Aksen Jepang", stability: 0.50, clarity: 0.70, style: 0.15, speed: 1.00, languageCode: "ja", desc: "Pelafalan dengan aksen Asia Timur (biasanya vokal lebih tegas/kaku)." },
+  { no: 5, name: "Aksen Spanyol", stability: 0.50, clarity: 0.70, style: 0.20, speed: 1.00, languageCode: "es", desc: "Logat Eropa Selatan dengan intonasi ucapan yang lebih bergelombang." },
+  { no: 6, name: "Aksen Arab", stability: 0.55, clarity: 0.70, style: 0.15, speed: 1.00, languageCode: "ar", desc: "Simulasi penekanan tenggorokan (konsonan tajam)." },
+  { no: 7, name: "Aksen Jerman", stability: 0.60, clarity: 0.75, style: 0.10, speed: 1.00, languageCode: "de", desc: "Karakter bicara tegas, keras, dan artikulasi huruf mati yang solid." },
+  { no: 8, name: "Cepat Normal", stability: 0.65, clarity: 0.70, style: 0.00, speed: 1.15, languageCode: "id", desc: "Simulasi pengucapan cepat (misal saat terburu-buru)." },
+  { no: 9, name: "Cepat Aksen", stability: 0.50, clarity: 0.70, style: 0.20, speed: 1.20, languageCode: "en", desc: "Sangat cepat beraksen Inggris untuk melatih toleransi tempo cepat." },
+  { no: 10, name: "Lambat Normal", stability: 0.60, clarity: 0.75, style: 0.00, speed: 0.85, languageCode: "id", desc: "Pengucapan lambat/seret untuk melatih toleransi tempo lambat." },
+  { no: 11, name: "Lambat Aksen", stability: 0.55, clarity: 0.70, style: 0.15, speed: 0.80, languageCode: "en", desc: "Lambat beraksen Inggris (pengucapan terseret)." },
+  { no: 12, name: "Karakter Lain 1", stability: 0.40, clarity: 0.35, style: 0.50, speed: 1.00, languageCode: "id", desc: "Clarity rendah mengubah karakteristik pitch, mensimulasikan orang lain." },
+  { no: 13, name: "Karakter Lain 2", stability: 0.45, clarity: 0.30, style: 0.60, speed: 1.00, languageCode: "en", desc: "Karakter suara orang lain beraksen Inggris." },
+  { no: 14, name: "Sangat Variatif", stability: 0.15, clarity: 0.60, style: 0.30, speed: 1.05, languageCode: "id", desc: "Stabilitas sangat rendah membuat intonasi tiap take berbeda jauh." },
+  { no: 15, name: "Tegas / Emosional", stability: 0.30, clarity: 0.65, style: 0.80, speed: 1.10, languageCode: "id", desc: "Pengucapan dengan penekanan emosi tinggi/kencang." },
+  { no: 16, name: "Flat / Monoton", stability: 0.95, clarity: 0.80, style: 0.00, speed: 0.95, languageCode: "id", desc: "Suara sangat datar tanpa ekspresi (simulasi suara robotik/mengantuk)." },
+  { no: 17, name: "Bisik Cepat", stability: 0.20, clarity: 0.40, style: 0.70, speed: 1.15, languageCode: "id", desc: "Bisikan cepat, melatih deteksi saat pengguna berbisik dekat mic." },
+  { no: 18, name: "Bisik Lambat", stability: 0.30, clarity: 0.45, style: 0.50, speed: 0.85, languageCode: "ja", desc: "Bisikan lambat beraksen Asia (desisan angin lebih dominan)." },
+  { no: 19, name: "Suara Jauh / Samar", stability: 0.50, clarity: 0.25, style: 0.25, speed: 1.05, languageCode: "id", desc: "Clarity 25% mendistorsi vokal asli, mensimulasikan jarak jauh." },
+  { no: 20, name: "Sengau (Nasal)", stability: 0.40, clarity: 0.55, style: 0.40, speed: 1.10, languageCode: "fr", desc: "Logat Prancis memberikan efek sengau (nasal) pada pengucapan kata." },
+  { no: 21, name: "Aksen Melayu", stability: 0.55, clarity: 0.70, style: 0.10, speed: 1.00, languageCode: "ms", desc: "Logat melayu serumpun, artikulasi vokal mirip tapi berlogat khas." },
+  { no: 22, name: "Aksen Korea", stability: 0.50, clarity: 0.75, style: 0.20, speed: 0.95, languageCode: "ko", desc: "Logat Korea dengan intonasi lembut khas Asia Timur." },
+  { no: 23, name: "Aksen Italia", stability: 0.50, clarity: 0.65, style: 0.35, speed: 1.05, languageCode: "it", desc: "Dinamika bicara dinamis, bersemangat, dan berayun khas Italia." },
+  { no: 24, name: "Aksen India", stability: 0.60, clarity: 0.75, style: 0.15, speed: 1.00, languageCode: "hi", desc: "Karakter bunyi konsonan dental 'd' dan 't' yang sangat tebal." },
+  { no: 25, name: "Aksen Swedia", stability: 0.55, clarity: 0.70, style: 0.20, speed: 0.95, languageCode: "sv", desc: "Logat Eropa Utara yang melodik/sing-song (tinggi-rendah berirama)." },
+  { no: 26, name: "Aksen Vietnam", stability: 0.40, clarity: 0.65, style: 0.25, speed: 1.05, languageCode: "vi", desc: "Logat Asia Tenggara daratan dengan dinamika nada naik-turun." },
+  { no: 27, name: "Aksen Thailand", stability: 0.45, clarity: 0.70, style: 0.20, speed: 1.00, languageCode: "th", desc: "Pengucapan bernada lembut dan tempo cenderung tenang." },
+  { no: 28, name: "Cepat & Ekspresif", stability: 0.25, clarity: 0.60, style: 0.60, speed: 1.15, languageCode: "id", desc: "Suara terburu-buru dengan intonasi emosi tinggi." },
+  { no: 29, name: "Lambat & Ekspresif", stability: 0.30, clarity: 0.60, style: 0.65, speed: 0.85, languageCode: "id", desc: "Gaya bicara dramatis, lambat, namun berenergi tinggi." },
+  { no: 30, name: "Bisik Aksen Arab", stability: 0.25, clarity: 0.40, style: 0.50, speed: 1.00, languageCode: "ar", desc: "Bisikan dengan gesekan (frikatif) tenggorokan yang kuat." },
+  { no: 31, name: "Bisik Aksen Jerman", stability: 0.25, clarity: 0.45, style: 0.45, speed: 1.05, languageCode: "de", desc: "Bisikan tajam dengan letupan (plosif) konsonan akhir." },
+  { no: 32, name: "Simulasi Anak-anak", stability: 0.35, clarity: 0.45, style: 0.50, speed: 1.10, languageCode: "id", desc: "Clarity rendah & speed cepat mensimulasikan pita suara anak kecil." },
+  { no: 33, name: "Simulasi Lansia", stability: 0.30, clarity: 0.50, style: 0.40, speed: 0.80, languageCode: "id", desc: "Tempo sangat lambat & stabilitas rendah (mensimulasikan suara bergetar)." },
+  { no: 34, name: "Suara Berat / Slavia", stability: 0.70, clarity: 0.55, style: 0.30, speed: 0.90, languageCode: "ru", desc: "Suara berat, tegas, tempo tenang dengan timbre Slavia tebal." },
+  { no: 35, name: "Panik / Darurat", stability: 0.20, clarity: 0.55, style: 0.75, speed: 1.20, languageCode: "id", desc: "Tempo maksimal & stabilitas minim (simulasi saat berteriak meminta tolong)." },
+  { no: 36, name: "Suara Bergumam", stability: 0.15, clarity: 0.40, style: 0.10, speed: 0.95, languageCode: "id", desc: "Stabilitas sangat rendah menghasilkan artikulasi malas/tidak jelas." },
+  { no: 37, name: "Monoton Cepat (Robot)", stability: 0.98, clarity: 0.85, style: 0.00, speed: 1.15, languageCode: "en", desc: "Stabilitas maksimum, tanpa emosi (simulasi asisten AI lain/robot)." },
+  { no: 38, name: "Aksen Portugis", stability: 0.50, clarity: 0.70, style: 0.25, speed: 1.00, languageCode: "pt", desc: "Logat Eropa Selatan dengan artikulasi vokal tertutup and lembut." },
+  { no: 39, name: "Aksen Turki", stability: 0.55, clarity: 0.75, style: 0.15, speed: 0.95, languageCode: "tr", desc: "Logat dengan harmonisasi vokal khas bahasa Turki." },
+  { no: 40, name: "Aksen Polandia", stability: 0.55, clarity: 0.70, style: 0.20, speed: 1.00, languageCode: "pl", desc: "Karakter suara dengan bunyi desis sibilant (sz, cz) yang khas." }
+];
+
 export default function ElevenLabsBulkPage() {
   // Config state
   const [text, setText] = useState("halo aero");
@@ -61,6 +104,7 @@ export default function ElevenLabsBulkPage() {
   const [useSpeakerBoost, setUseSpeakerBoost] = useState(true);
   const [speed, setSpeed] = useState(1.0);
   const [generationsPerVoice, setGenerationsPerVoice] = useState(1);
+  const [selectedPreset, setSelectedPreset] = useState("");
 
   // Tab filtering
   const [activeTab, setActiveTab] = useState<"all" | "premade" | "database">("all");
@@ -105,6 +149,20 @@ export default function ElevenLabsBulkPage() {
       alert("Terjadi kesalahan koneksi saat membuka folder picker.");
     } finally {
       setSelectingFolder(false);
+    }
+  };
+
+  const handleSelectPreset = (presetNo: string) => {
+    setSelectedPreset(presetNo);
+    if (!presetNo) return;
+
+    const preset = PRESET_COMBINATIONS.find((p) => p.no.toString() === presetNo);
+    if (preset) {
+      setOverrideVoiceSettings(true);
+      setStability(preset.stability);
+      setSimilarityBoost(preset.clarity);
+      setStyle(preset.style);
+      addLog(`Preset #${preset.no} (${preset.name}) diterapkan (Stability, Clarity, & Style).`, "info");
     }
   };
 
@@ -612,6 +670,30 @@ export default function ElevenLabsBulkPage() {
                 {overrideVoiceSettings && (
                   <div className="space-y-4 bg-slate-950/50 p-4 rounded-xl border border-slate-900/80 mt-2 animate-fadeIn text-xs">
                     
+                    {/* Preset Selector */}
+                    <div className="space-y-1.5 pb-3 border-b border-slate-900">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Preset Kombinasi Parameter (Edge Impulse)
+                      </label>
+                      <select
+                        value={selectedPreset}
+                        onChange={(e) => handleSelectPreset(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 font-bold"
+                      >
+                        <option value="">⚙️ Kustom / Pilih Preset...</option>
+                        {PRESET_COMBINATIONS.map((p) => (
+                          <option key={p.no} value={p.no.toString()}>
+                            {p.no}. {p.name} (Stab:{Math.round(p.stability*100)}%, Clar:{Math.round(p.clarity*100)}%, Style:{Math.round(p.style*100)}%)
+                          </option>
+                        ))}
+                      </select>
+                      {selectedPreset && (
+                        <p className="text-[9px] text-indigo-400 mt-1 leading-relaxed italic">
+                          💡 Deskripsi: {PRESET_COMBINATIONS.find((p) => p.no.toString() === selectedPreset)?.desc}
+                        </p>
+                      )}
+                    </div>
+
                     {/* Stability Slider */}
                     <div className="space-y-1">
                       <div className="flex justify-between font-semibold">
@@ -623,7 +705,10 @@ export default function ElevenLabsBulkPage() {
                         max="1"
                         step="0.05"
                         value={stability}
-                        onChange={(e) => setStability(parseFloat(e.target.value))}
+                        onChange={(e) => {
+                          setStability(parseFloat(e.target.value));
+                          setSelectedPreset("");
+                        }}
                         className="w-full h-1 bg-slate-850 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                       />
                       <div className="flex justify-between text-[9px] text-slate-500">
@@ -646,7 +731,10 @@ export default function ElevenLabsBulkPage() {
                         max="1"
                         step="0.05"
                         value={similarityBoost}
-                        onChange={(e) => setSimilarityBoost(parseFloat(e.target.value))}
+                        onChange={(e) => {
+                          setSimilarityBoost(parseFloat(e.target.value));
+                          setSelectedPreset("");
+                        }}
                         className="w-full h-1 bg-slate-850 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                       />
                       <div className="flex justify-between text-[9px] text-slate-500">
@@ -669,7 +757,10 @@ export default function ElevenLabsBulkPage() {
                         max="1"
                         step="0.05"
                         value={style}
-                        onChange={(e) => setStyle(parseFloat(e.target.value))}
+                        onChange={(e) => {
+                          setStyle(parseFloat(e.target.value));
+                          setSelectedPreset("");
+                        }}
                         className="w-full h-1 bg-slate-850 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                       />
                       <div className="flex justify-between text-[9px] text-slate-500">
