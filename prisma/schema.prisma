@@ -1,0 +1,23 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 13. ELEVENLABS VOICE MANAGER
+// ==========================================
+
+model ElevenLabsVoice {
+  id        String   @id @default(cuid())
+  voiceId   String   @unique
+  name      String
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
