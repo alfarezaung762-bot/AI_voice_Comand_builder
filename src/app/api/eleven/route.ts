@@ -212,7 +212,9 @@ export async function PUT(req: Request) {
       downloadAsZip = true,
       languageCode,
       voiceSettings,
-      generationsPerVoice = 1
+      generationsPerVoice = 1,
+      fileNameFormat = "standard",
+      labelOverride
     } = body;
 
     const isLocalWindows = process.platform === "win32";
@@ -229,9 +231,10 @@ export async function PUT(req: Request) {
     const seconds = String(now.getSeconds()).padStart(2, "0");
     const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
 
-    const apiKey = customApiKey || process.env.ELEVENLABS_API_KEY;
+    const apiKeyRaw = customApiKey || process.env.ELEVENLABS_API_KEY;
+    const apiKeys = (apiKeyRaw || "").split(",").map((k: string) => k.trim()).filter(Boolean);
 
-    if (!apiKey) {
+    if (apiKeys.length === 0) {
       return NextResponse.json(
         { message: "API Key ElevenLabs tidak ditemukan. Masukkan di file .env atau langsung di UI." },
         { status: 400 }
@@ -272,6 +275,8 @@ export async function PUT(req: Request) {
 
     // Inisialisasi ADM-ZIP jika activeDownloadAsZip bernilai true
     const zip = activeDownloadAsZip ? new AdmZip() : null;
+
+    let activeKeyIndex = 0;
 
     for (const voice of voices) {
       const { voiceId, name } = voice;
@@ -323,42 +328,74 @@ export async function PUT(req: Request) {
             }
           }
 
-          console.log(`[API ElevenLabs] Kirim payload ke ElevenLabs:`, JSON.stringify(reqPayload, null, 2));
-
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              "xi-api-key": apiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(reqPayload),
-          });
+          let response;
+          let responseBuffer = null;
+          let success = false;
+          let parsedError = "";
 
           const nameWithTake = generationsPerVoice > 1 ? `${name} (Take ${take})` : name;
 
-          if (!response.ok) {
+          // Loop rotasi API Key otomatis jika menemui limit kuota
+          for (let attempt = activeKeyIndex; attempt < apiKeys.length; attempt++) {
+            const currentApiKey = apiKeys[attempt];
+            activeKeyIndex = attempt; // Perbarui pointer key aktif secara global untuk request ini
+
+            console.log(`[API ElevenLabs] Mengirim request dengan API Key ke-${attempt + 1}/${apiKeys.length}`);
+
+            response = await fetch(url, {
+              method: "POST",
+              headers: {
+                "xi-api-key": currentApiKey,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(reqPayload),
+            });
+
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              responseBuffer = Buffer.from(arrayBuffer);
+              success = true;
+              break;
+            }
+
             const errText = await response.text();
-            let parsedError = errText;
+            parsedError = errText;
             try {
               const errJson = JSON.parse(errText);
               parsedError = errJson.detail?.message || errText;
-            } catch {
-              // Abaikan error parsing JSON jika response bukan JSON
+            } catch {}
+
+            const errLower = parsedError.toLowerCase();
+            const isQuotaOrAuthError = 
+              response.status === 401 || 
+              response.status === 429 || 
+              response.status === 400 ||
+              errLower.includes("quota") || 
+              errLower.includes("limit") || 
+              errLower.includes("credit") || 
+              errLower.includes("character") ||
+              errLower.includes("insufficient");
+
+            if (isQuotaOrAuthError && attempt < apiKeys.length - 1) {
+              console.log(`[API ElevenLabs] API Key ke-${attempt + 1} habis kuota atau error: ${parsedError}. Mencoba beralih ke API Key berikutnya...`);
+              continue;
+            } else {
+              // Jika bukan error kuota, atau tidak ada key tersisa, break
+              break;
             }
-            
+          }
+
+          if (!success) {
             results.push({
               voiceId,
               name: nameWithTake,
               success: false,
-              error: `ElevenLabs API Error (${response.status}): ${parsedError}`,
+              error: `ElevenLabs API Error: ${parsedError}`,
             });
             continue;
           }
 
-          // Ambil arrayBuffer dari response
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-
+          const buffer = responseBuffer as Buffer;
           let finalBuffer: any = buffer;
           if (isWavConversionNeeded) {
             try {
@@ -381,16 +418,25 @@ export async function PUT(req: Request) {
             .replace(/__+/g, "_")
             .replace(/^_+|_+$/g, "");
           const langSuffix = languageCode || "auto";
-          const safeText = text
-            .replace(/\[.*?\]/g, "") // Hapus tag prompt gaya bisik/teriak
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-zA-Z0-9]/g, "_")
-            .substring(0, 30)
-            .replace(/__+/g, "_")
-            .replace(/^_+|_+$/g, "");
+          let safeText = "";
+          if (labelOverride) {
+            safeText = labelOverride
+              .replace(/[^a-zA-Z0-9_-]/g, "_")
+              .replace(/__+/g, "_")
+              .replace(/^_+|_+$/g, "");
+          } else {
+            safeText = text
+              .replace(/\[.*?\]/g, "") // Hapus tag prompt gaya bisik/teriak
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-zA-Z0-9]/g, "_")
+              .substring(0, 30)
+              .replace(/__+/g, "_")
+              .replace(/^_+|_+$/g, "");
+          }
           const takeSuffix = generationsPerVoice > 1 ? `_take${take}` : "";
-          const filename = `${safeText}_${langSuffix}_${safeModelName}_${timestamp}${takeSuffix}.${ext}`;
+          const separator = (labelOverride || fileNameFormat === "edge_impulse") ? "." : "_";
+          const filename = `${safeText}${separator}${langSuffix}_${safeModelName}_${timestamp}${takeSuffix}.${ext}`;
 
           let savedPath = undefined;
           if (activeSaveLocally) {

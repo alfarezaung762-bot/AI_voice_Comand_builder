@@ -95,6 +95,7 @@ export default function ElevenLabsBulkPage() {
   const [downloadAsZip, setDownloadAsZip] = useState(false);
   const [saveLocally, setSaveLocally] = useState(true);
   const [languageCode, setLanguageCode] = useState("auto");
+  const [fileNameFormat, setFileNameFormat] = useState("standard");
   const [isCloud, setIsCloud] = useState(false);
 
   // Voice Settings override state
@@ -106,6 +107,161 @@ export default function ElevenLabsBulkPage() {
   const [speed, setSpeed] = useState(1.0);
   const [generationsPerVoice, setGenerationsPerVoice] = useState(1);
   const [selectedPreset, setSelectedPreset] = useState("");
+
+  // Multi-Command state
+  const [generationMode, setGenerationMode] = useState<"single" | "multi" | "infer_filename">("single");
+  const [multiCommands, setMultiCommands] = useState<Array<{ id: string; text: string; outputPath: string }>>([]);
+  const [inferCommands, setInferCommands] = useState<Array<{ id: string; text: string; label: string }>>([]);
+  const [inferGlobalOutputPath, setInferGlobalOutputPath] = useState("./elevenlabs_outputs");
+
+  // Load configuration and commands from localStorage on mount
+  useEffect(() => {
+    const savedMode = localStorage.getItem("elevenlabs_generation_mode");
+    if (savedMode) {
+      setGenerationMode(savedMode as any);
+    }
+    const saved = localStorage.getItem("elevenlabs_multi_commands");
+    if (saved) {
+      try {
+        setMultiCommands(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse saved multiCommands", e);
+      }
+    }
+    const savedInfer = localStorage.getItem("elevenlabs_infer_commands");
+    if (savedInfer) {
+      try {
+        setInferCommands(JSON.parse(savedInfer));
+      } catch (e) {
+        console.error("Failed to parse saved inferCommands", e);
+      }
+    }
+    const savedInferPath = localStorage.getItem("elevenlabs_infer_global_path");
+    if (savedInferPath) {
+      setInferGlobalOutputPath(savedInferPath);
+    }
+  }, []);
+
+  const handleSetGenerationMode = (mode: "single" | "multi" | "infer_filename") => {
+    setGenerationMode(mode);
+    localStorage.setItem("elevenlabs_generation_mode", mode);
+  };
+
+  const saveMultiCommands = (commands: Array<{ id: string; text: string; outputPath: string }>) => {
+    setMultiCommands(commands);
+    localStorage.setItem("elevenlabs_multi_commands", JSON.stringify(commands));
+  };
+
+  const saveInferCommands = (commands: Array<{ id: string; text: string; label: string }>) => {
+    setInferCommands(commands);
+    localStorage.setItem("elevenlabs_infer_commands", JSON.stringify(commands));
+  };
+
+  const handleSetInferGlobalOutputPath = (pathVal: string) => {
+    setInferGlobalOutputPath(pathVal);
+    localStorage.setItem("elevenlabs_infer_global_path", pathVal);
+  };
+
+  const handleAddInferCommand = () => {
+    const newCmd = {
+      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      text: "",
+      label: ""
+    };
+    saveInferCommands([...inferCommands, newCmd]);
+  };
+
+  const handleDeleteInferCommand = (id: string) => {
+    saveInferCommands(inferCommands.filter(c => c.id !== id));
+  };
+
+  const handleUpdateInferCommand = (id: string, field: "text" | "label", value: string) => {
+    saveInferCommands(
+      inferCommands.map(c => {
+        if (c.id === id) {
+          const updated = { ...c, [field]: value };
+          // Auto-suggest label from text if field being edited is "text" AND label was not edited manually (or is empty/equals the old formatted text)
+          if (field === "text") {
+            const oldSuggestedLabel = c.text
+              .replace(/[^a-zA-Z0-9\s_-]/g, "")
+              .replace(/\s+/g, "_");
+            if (!c.label || c.label === oldSuggestedLabel) {
+              updated.label = value
+                .replace(/[^a-zA-Z0-9\s_-]/g, "")
+                .replace(/\s+/g, "_");
+            }
+          }
+          return updated;
+        }
+        return c;
+      })
+    );
+  };
+
+  const handleSelectGlobalFolderForInfer = async () => {
+    setSelectingFolder(true);
+    try {
+      const res = await fetch("/api/eleven?action=select-directory");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.selectedPath) {
+          handleSetInferGlobalOutputPath(data.selectedPath);
+        } else if (data.message) {
+          alert(data.message);
+        }
+      } else {
+        const data = await res.json();
+        alert(data.message || "Gagal membuka folder picker.");
+      }
+    } catch (err) {
+      console.error("Error selecting folder:", err);
+      alert("Terjadi kesalahan koneksi saat membuka folder picker.");
+    } finally {
+      setSelectingFolder(false);
+    }
+  };
+
+  const handleAddMultiCommand = () => {
+    const newCmd = {
+      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      text: "",
+      outputPath: outputPath // default to current single output path
+    };
+    saveMultiCommands([...multiCommands, newCmd]);
+  };
+
+  const handleDeleteMultiCommand = (id: string) => {
+    saveMultiCommands(multiCommands.filter(c => c.id !== id));
+  };
+
+  const handleUpdateMultiCommand = (id: string, field: "text" | "outputPath", value: string) => {
+    saveMultiCommands(
+      multiCommands.map(c => (c.id === id ? { ...c, [field]: value } : c))
+    );
+  };
+
+  const handleSelectFolderForMultiCommand = async (id: string) => {
+    setSelectingFolder(true);
+    try {
+      const res = await fetch("/api/eleven?action=select-directory");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.selectedPath) {
+          handleUpdateMultiCommand(id, "outputPath", data.selectedPath);
+        } else if (data.message) {
+          alert(data.message);
+        }
+      } else {
+        const data = await res.json();
+        alert(data.message || "Gagal membuka folder picker.");
+      }
+    } catch (err) {
+      console.error("Error selecting folder:", err);
+      alert("Terjadi kesalahan koneksi saat membuka folder picker.");
+    } finally {
+      setSelectingFolder(false);
+    }
+  };
 
   // Tab filtering
   const [activeTab, setActiveTab] = useState<"all" | "premade" | "database">("all");
@@ -163,7 +319,9 @@ export default function ElevenLabsBulkPage() {
       setStability(preset.stability);
       setSimilarityBoost(preset.clarity);
       setStyle(preset.style);
-      addLog(`Preset #${preset.no} (${preset.name}) diterapkan (Stability, Clarity, & Style).`, "info");
+      setSpeed(preset.speed);
+      setLanguageCode(preset.languageCode);
+      addLog(`Preset #${preset.no} (${preset.name}) diterapkan (Stability, Clarity, Style, Speed: ${preset.speed}x, Bahasa: ${preset.languageCode}).`, "info");
     }
   };
 
@@ -173,6 +331,10 @@ export default function ElevenLabsBulkPage() {
     const savedKey = localStorage.getItem("elevenlabs_custom_api_key");
     if (savedKey) {
       setApiKey(savedKey);
+    }
+    const savedFormat = localStorage.getItem("elevenlabs_filename_format");
+    if (savedFormat) {
+      setFileNameFormat(savedFormat);
     }
     if (typeof window !== "undefined") {
       const isLh = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -184,6 +346,11 @@ export default function ElevenLabsBulkPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleSetFileNameFormat = (format: string) => {
+    setFileNameFormat(format);
+    localStorage.setItem("elevenlabs_filename_format", format);
+  };
 
   // Fetch default premade voices automatically when API Key is available
   useEffect(() => {
@@ -379,101 +546,204 @@ export default function ElevenLabsBulkPage() {
     addLog(`Memilih ${listToSelect.length} model suara teratas.`, "info");
   };
 
+  const executeGenerationForCommand = async (
+    cmdText: string, 
+    cmdOutputPath: string, 
+    selectedVoices: Array<{ voiceId: string; name: string }>,
+    onProgressCallback?: (current: number) => void,
+    labelOverride?: string
+  ) => {
+    const res = await fetch("/api/eleven", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: cmdText,
+        voices: selectedVoices,
+        modelId,
+        outputFormat,
+        outputPath: cmdOutputPath,
+        apiKey,
+        saveLocally,
+        downloadAsZip,
+        languageCode,
+        generationsPerVoice,
+        fileNameFormat,
+        labelOverride,
+        voiceSettings: overrideVoiceSettings ? {
+          stability,
+          similarityBoost,
+          style,
+          useSpeakerBoost,
+          speed,
+        } : undefined,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      let successCount = 0;
+      data.results.forEach((resItem: GenerateResult, resIdx: number) => {
+        if (resItem.success) {
+          successCount++;
+          const saveMsg = resItem.savedPath ? ` -> Disimpan di: ${resItem.savedPath}` : "";
+          addLog(`✅ [BERHASIL] ${resItem.name}${saveMsg}`, "success");
+        } else {
+          addLog(`❌ [GAGAL] ${resItem.name} -> ${resItem.error}`, "error");
+        }
+        
+        if (onProgressCallback) {
+          onProgressCallback(resIdx + 1);
+        }
+      });
+
+      // Trigger browser download if zip was returned
+      if (data.zipBase64) {
+        try {
+          const byteCharacters = atob(data.zipBase64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "application/zip" });
+          
+          const zipName = `${cmdText.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}_voices.zip`;
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = zipName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          addLog(`📁 File ZIP "${zipName}" dikirim ke browser.`, "success");
+        } catch (zipErr) {
+          console.error("Gagal mengunduh ZIP di browser:", zipErr);
+          addLog("Gagal memproses unduhan ZIP di browser.", "error");
+        }
+      }
+
+      addLog(`Perintah selesai. ${successCount}/${selectedVoices.length} suara berhasil digenerate.`, "success");
+    } else {
+      const errData = await res.json();
+      throw new Error(errData.message || "Terjadi kesalahan di server.");
+    }
+  };
+
   const handleGenerateBulk = async () => {
     if (selectedVoiceIds.size === 0) {
       alert("Pilih minimal satu suara untuk di-generate.");
       return;
     }
-    if (!text.trim()) {
-      alert("Masukkan kalimat teks yang ingin diucapkan.");
-      return;
-    }
-
-    setIsGenerating(true);
-    setLogs([]); // Reset logs
-    addLog(`Memulai proses Bulk TTS untuk ${selectedVoiceIds.size} suara...`, "info");
 
     const selectedVoices = allCombinedVoices
       .filter((v) => selectedVoiceIds.has(v.voiceId))
       .map((v) => ({ voiceId: v.voiceId, name: v.name }));
 
-    setProgress({ current: 0, total: selectedVoices.length });
+    setIsGenerating(true);
+    setLogs([]); // Reset logs
 
-    try {
-      const res = await fetch("/api/eleven", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          voices: selectedVoices,
-          modelId,
-          outputFormat,
-          outputPath,
-          apiKey,
-          saveLocally,
-          downloadAsZip,
-          languageCode,
-          generationsPerVoice,
-          voiceSettings: overrideVoiceSettings ? {
-            stability,
-            similarityBoost,
-            style,
-            useSpeakerBoost,
-            speed,
-          } : undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        
-        // Log individual results
-        let successCount = 0;
-        data.results.forEach((resItem: GenerateResult) => {
-          if (resItem.success) {
-            successCount++;
-            const saveMsg = resItem.savedPath ? ` -> Disimpan di server: ${resItem.savedPath}` : "";
-            addLog(`✅ [BERHASIL] ${resItem.name}${saveMsg}`, "success");
-          } else {
-            addLog(`❌ [GAGAL] ${resItem.name} -> ${resItem.error}`, "error");
-          }
-        });
-
-        // Trigger browser download if zip was returned
-        if (data.zipBase64) {
-          try {
-            const byteCharacters = atob(data.zipBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: "application/zip" });
-            
-            const zipName = `${text.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}_voices.zip`;
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = zipName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            addLog(`📁 File ZIP "${zipName}" dikirim ke browser. Jendela penyimpanan (Save As) akan muncul secara otomatis.`, "success");
-          } catch (zipErr) {
-            console.error("Gagal mengunduh ZIP di browser:", zipErr);
-            addLog("Gagal memproses unduhan ZIP di browser.", "error");
-          }
-        }
-
-        setProgress({ current: selectedVoices.length, total: selectedVoices.length });
-        addLog(`Proses selesai. ${successCount}/${selectedVoices.length} suara berhasil digenerate.`, "success");
-      } else {
-        const errData = await res.json();
-        addLog(`Gagal: ${errData.message || "Terjadi kesalahan di server."}`, "error");
+    if (generationMode === "single") {
+      if (!text.trim()) {
+        alert("Masukkan kalimat teks yang ingin diucapkan.");
+        setIsGenerating(false);
+        return;
       }
-    } catch {
-      addLog("Terjadi kesalahan jaringan/koneksi saat generate.", "error");
-    } finally {
+      
+      addLog(`Memulai proses Bulk TTS untuk ${selectedVoiceIds.size} suara...`, "info");
+      setProgress({ current: 0, total: selectedVoices.length });
+
+      try {
+        await executeGenerationForCommand(text, outputPath, selectedVoices, (doneInCmd) => {
+          setProgress({ current: doneInCmd, total: selectedVoices.length });
+        });
+      } catch (err) {
+        addLog(`Terjadi kesalahan: ${err instanceof Error ? err.message : err}`, "error");
+      } finally {
+        setIsGenerating(false);
+      }
+    } else if (generationMode === "multi") {
+      // Multi Mode
+      const activeCommands = multiCommands.filter(c => c.text.trim() !== "");
+      if (activeCommands.length === 0) {
+        alert("Tambahkan minimal satu perintah suara dengan teks yang terisi.");
+        setIsGenerating(false);
+        return;
+      }
+
+      addLog(`Memulai proses Multi-Command TTS untuk ${activeCommands.length} perintah & ${selectedVoiceIds.size} suara...`, "info");
+      
+      const totalSteps = activeCommands.length * selectedVoices.length;
+      setProgress({ current: 0, total: totalSteps });
+      let completedSteps = 0;
+
+      for (let i = 0; i < activeCommands.length; i++) {
+        const cmd = activeCommands[i];
+        addLog(`📥 [PERINTAH ${i+1}/${activeCommands.length}] Memproses kata: "${cmd.text}" -> Folder: ${cmd.outputPath}`, "info");
+        
+        try {
+          await executeGenerationForCommand(
+            cmd.text, 
+            cmd.outputPath, 
+            selectedVoices, 
+            (doneInCmd) => {
+              setProgress({
+                current: completedSteps + doneInCmd,
+                total: totalSteps
+              });
+            }
+          );
+          completedSteps += selectedVoices.length;
+        } catch (cmdErr) {
+          addLog(`❌ Gagal memproses perintah "${cmd.text}": ${cmdErr instanceof Error ? cmdErr.message : cmdErr}`, "error");
+          completedSteps += selectedVoices.length;
+          setProgress({ current: completedSteps, total: totalSteps });
+        }
+      }
+
+      addLog("🎉 Seluruh rangkaian proses Multi-Command selesai!", "success");
+      setIsGenerating(false);
+    } else if (generationMode === "infer_filename") {
+      // Infer filename mode
+      const activeCommands = inferCommands.filter(c => c.text.trim() !== "");
+      if (activeCommands.length === 0) {
+        alert("Tambahkan minimal satu perintah suara dengan teks yang terisi.");
+        setIsGenerating(false);
+        return;
+      }
+
+      addLog(`Memulai proses Infer from Filename TTS untuk ${activeCommands.length} perintah & ${selectedVoiceIds.size} suara...`, "info");
+      
+      const totalSteps = activeCommands.length * selectedVoices.length;
+      setProgress({ current: 0, total: totalSteps });
+      let completedSteps = 0;
+
+      for (let i = 0; i < activeCommands.length; i++) {
+        const cmd = activeCommands[i];
+        const labelVal = cmd.label || cmd.text.replace(/[^a-zA-Z0-9\s_-]/g, "").replace(/\s+/g, "_");
+        addLog(`📥 [PERINTAH ${i+1}/${activeCommands.length}] Memproses kata: "${cmd.text}" -> Label: "${labelVal}"`, "info");
+        
+        try {
+          await executeGenerationForCommand(
+            cmd.text, 
+            inferGlobalOutputPath, 
+            selectedVoices, 
+            (doneInCmd) => {
+              setProgress({
+                current: completedSteps + doneInCmd,
+                total: totalSteps
+              });
+            },
+            labelVal
+          );
+          completedSteps += selectedVoices.length;
+        } catch (cmdErr) {
+          addLog(`❌ Gagal memproses perintah "${cmd.text}": ${cmdErr instanceof Error ? cmdErr.message : cmdErr}`, "error");
+          completedSteps += selectedVoices.length;
+          setProgress({ current: completedSteps, total: totalSteps });
+        }
+      }
+
+      addLog("🎉 Seluruh rangkaian proses Infer from Filename selesai!", "success");
       setIsGenerating(false);
     }
   };
@@ -511,58 +781,256 @@ export default function ElevenLabsBulkPage() {
                 ⚙️ Pengaturan TTS
               </h2>
 
-              {/* Teks Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Kalimat / Kata Command
-                </label>
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Misalnya: halo aero"
-                  rows={2}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-slate-100 font-medium placeholder-slate-600 resize-none"
-                />
-                <div className="flex justify-between items-center mt-1">
-                  <div className="flex flex-wrap gap-1">
-                    <span className="text-[9px] text-slate-500 self-center">Gaya Prompt:</span>
-                    <button
-                      type="button"
-                      onClick={() => setText(`[whisper] ${text.replace(/\[.*?\]\s*/g, "")}`)}
-                      className="text-[9px] bg-slate-950 border border-slate-800 text-indigo-400 font-bold px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
-                      title="Simulasi pelan / jarak jauh"
-                    >
-                      🤫 Bisik
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setText(`[shouting] ${text.replace(/\[.*?\]\s*/g, "")}`)}
-                      className="text-[9px] bg-slate-950 border border-slate-800 text-indigo-400 font-bold px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
-                      title="Simulasi teriakan kencang"
-                    >
-                      🔊 Teriak
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setText(`[excited] ${text.replace(/\[.*?\]\s*/g, "")}`)}
-                      className="text-[9px] bg-slate-950 border border-slate-800 text-indigo-400 font-bold px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
-                      title="Simulasi penuh gairah / ceria"
-                    >
-                      ⚡ Ceria
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setText(text.replace(/\[.*?\]\s*/g, ""))}
-                      className="text-[9px] bg-slate-950 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
-                    >
-                      Normal
-                    </button>
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    {text.length} karakter (total {text.length * (selectedVoiceIds.size || 1)} karakter)
+              {/* Mode Selector */}
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 text-xs font-bold w-full gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleSetGenerationMode("single")}
+                  className={`flex-1 py-2 rounded-lg transition-all text-center ${
+                    generationMode === "single" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  🎙️ Satu Perintah
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetGenerationMode("multi")}
+                  className={`flex-1 py-2 rounded-lg transition-all text-center ${
+                    generationMode === "multi" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  🗂️ Banyak (Multi-Folder)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetGenerationMode("infer_filename")}
+                  className={`flex-1 py-2 rounded-lg transition-all text-center ${
+                    generationMode === "infer_filename" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  🏷️ Infer from Filename
+                </button>
+              </div>
+
+              {generationMode === "single" && (
+                <div className="space-y-1.5 animate-fadeIn">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Kalimat / Kata Command
+                  </label>
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Misalnya: halo aero"
+                    rows={2}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-slate-100 font-medium placeholder-slate-600 resize-none"
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-[9px] text-slate-500 self-center">Gaya Prompt:</span>
+                      <button
+                        type="button"
+                        onClick={() => setText(`[whisper] ${text.replace(/\[.*?\]\s*/g, "")}`)}
+                        className="text-[9px] bg-slate-950 border border-slate-800 text-indigo-400 font-bold px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
+                        title="Simulasi pelan / jarak jauh"
+                      >
+                        🤫 Bisik
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setText(`[shouting] ${text.replace(/\[.*?\]\s*/g, "")}`)}
+                        className="text-[9px] bg-slate-950 border border-slate-800 text-indigo-400 font-bold px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
+                        title="Simulasi teriakan kencang"
+                      >
+                        🔊 Teriak
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setText(`[excited] ${text.replace(/\[.*?\]\s*/g, "")}`)}
+                        className="text-[9px] bg-slate-950 border border-slate-800 text-indigo-400 font-bold px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
+                        title="Simulasi penuh gairah / ceria"
+                      >
+                        ⚡ Ceria
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setText(text.replace(/\[.*?\]\s*/g, ""))}
+                        className="text-[9px] bg-slate-950 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded hover:bg-slate-900 transition-colors"
+                      >
+                        Normal
+                      </button>
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {text.length} karakter (total {text.length * (selectedVoiceIds.size || 1)} karakter)
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {generationMode === "multi" && (
+                <div className="space-y-3 animate-fadeIn">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Daftar Perintah Suara ({multiCommands.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddMultiCommand}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 shrink-0"
+                    >
+                      <span>➕</span> Tambah Perintah
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                    {multiCommands.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500 text-xs italic border border-dashed border-slate-800/80 rounded-xl">
+                        Belum ada perintah. Klik &quot;Tambah Perintah&quot; untuk memulai.
+                      </div>
+                    ) : (
+                      multiCommands.map((cmd, idx) => (
+                        <div key={cmd.id} className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 relative space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] bg-slate-900 px-2 py-0.5 rounded-full text-indigo-400 font-mono font-bold">
+                              Perintah #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMultiCommand(cmd.id)}
+                              className="text-slate-500 hover:text-rose-500 text-[10px] font-bold transition-colors"
+                              title="Hapus"
+                            >
+                              🗑️ Hapus
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <input
+                              type="text"
+                              value={cmd.text}
+                              onChange={(e) => handleUpdateMultiCommand(cmd.id, "text", e.target.value)}
+                              placeholder="Contoh kata: port dua on"
+                              className="w-full bg-slate-900 border border-slate-850 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                            />
+                          </div>
+
+                          {!isCloud && (
+                            <div className="flex gap-1.5 items-center">
+                              <input
+                                type="text"
+                                value={cmd.outputPath}
+                                onChange={(e) => handleUpdateMultiCommand(cmd.id, "outputPath", e.target.value)}
+                                placeholder="Folder penyimpanan"
+                                className="flex-1 bg-slate-900 border border-slate-850 rounded-lg px-3 py-1.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-300 font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSelectFolderForMultiCommand(cmd.id)}
+                                disabled={selectingFolder}
+                                className="bg-slate-900 border border-slate-850 text-indigo-400 hover:text-indigo-300 font-bold px-2 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1 disabled:opacity-50 shrink-0"
+                                title="Pilih folder secara visual"
+                              >
+                                <span>📁</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {generationMode === "infer_filename" && (
+                <div className="space-y-3 animate-fadeIn">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Daftar Perintah (Infer from Filename) ({inferCommands.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddInferCommand}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 shrink-0"
+                    >
+                      <span>➕</span> Tambah Perintah
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                    {inferCommands.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500 text-xs italic border border-dashed border-slate-800/80 rounded-xl">
+                        Belum ada perintah. Klik &quot;Tambah Perintah&quot; untuk memulai.
+                      </div>
+                    ) : (
+                      inferCommands.map((cmd, idx) => (
+                        <div key={cmd.id} className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 relative space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] bg-slate-900 px-2 py-0.5 rounded-full text-indigo-400 font-mono font-bold">
+                              Perintah #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInferCommand(cmd.id)}
+                              className="text-slate-500 hover:text-rose-500 text-[10px] font-bold transition-colors"
+                              title="Hapus"
+                            >
+                              🗑️ Hapus
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase">Kalimat Perintah</label>
+                              <input
+                                type="text"
+                                value={cmd.text}
+                                onChange={(e) => handleUpdateInferCommand(cmd.id, "text", e.target.value)}
+                                placeholder="Contoh: Port Dua ON"
+                                className="w-full bg-slate-900 border border-slate-850 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase">Nama Label</label>
+                              <input
+                                type="text"
+                                value={cmd.label}
+                                onChange={(e) => handleUpdateInferCommand(cmd.id, "label", e.target.value)}
+                                placeholder="Contoh: Port_Dua_ON"
+                                className="w-full bg-slate-900 border border-slate-850 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200 font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {!isCloud && (
+                    <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Folder Penyimpanan Utama (Semua Label)
+                      </label>
+                      <div className="flex gap-1.5 items-center">
+                        <input
+                          type="text"
+                          value={inferGlobalOutputPath}
+                          onChange={(e) => handleSetInferGlobalOutputPath(e.target.value)}
+                          placeholder="Folder penyimpanan global"
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-300 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSelectGlobalFolderForInfer}
+                          disabled={selectingFolder}
+                          className="bg-slate-950 border border-slate-850 text-indigo-400 hover:text-indigo-300 font-bold px-3 py-2 rounded-xl text-xs transition-all flex items-center gap-1 disabled:opacity-50 shrink-0"
+                          title="Pilih folder secara visual"
+                        >
+                          <span>📁 Pilih</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Engine Model */}
               <div className="space-y-1.5">
@@ -625,7 +1093,6 @@ export default function ElevenLabsBulkPage() {
                   <option value="fil">🇵🇭 Filipina (Filipino)</option>
                   <option value="bg">🇧🇬 Bulgaria (Bulgarian)</option>
                   <option value="hr">🇭🇷 Kroasia (Croatian)</option>
-                  <option value="ta">🇮🇳 Tamil (Tamil)</option>
                   <option value="te">🇮🇳 Telugu (Telugu)</option>
                 </select>
                 <p className="text-[10px] text-slate-500">
@@ -659,6 +1126,24 @@ export default function ElevenLabsBulkPage() {
                     💡 Info: Format WAV akan dikonversi secara lokal oleh server menggunakan FFmpeg. Gratis untuk Free Tier!
                   </p>
                 )}
+              </div>
+
+              {/* Format Penamaan File */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Format Penamaan File
+                </label>
+                <select
+                  value={fileNameFormat}
+                  onChange={(e) => handleSetFileNameFormat(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-100 font-bold"
+                >
+                  <option value="standard">Standard (label_bahasa_suara...)</option>
+                  <option value="edge_impulse">Auto-Label Edge Impulse (label.bahasa_suara...)</option>
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  Format <strong>Auto-Label Edge Impulse</strong> menyisipkan tanda titik (.) tepat setelah kata label. Edge Impulse akan otomatis mendeteksi kata sebelum titik pertama sebagai label kelas saat diunggah dalam satu folder massal.
+                </p>
               </div>
 
               {/* Voice Settings Slider Override */}
@@ -845,52 +1330,54 @@ export default function ElevenLabsBulkPage() {
               </div>
 
               {/* Output Directory Path */}
-              <div className="space-y-2 pt-2 border-t border-slate-800/60">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Folder Penyimpanan
-                </label>
-                {isCloud ? (
-                  <div className="bg-indigo-950/40 border border-indigo-800/50 rounded-xl p-3 text-xs space-y-1 text-slate-300">
-                    <div className="font-bold text-indigo-300 flex items-center gap-1.5">
-                      <span>☁️</span>
-                      <span>Mode Cloud (Vercel) Aktif</span>
+              {generationMode === "single" && (
+                <div className="space-y-2 pt-2 border-t border-slate-800/60">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Folder Penyimpanan
+                  </label>
+                  {isCloud ? (
+                    <div className="bg-indigo-950/40 border border-indigo-800/50 rounded-xl p-3 text-xs space-y-1 text-slate-300">
+                      <div className="font-bold text-indigo-300 flex items-center gap-1.5">
+                        <span>☁️</span>
+                        <span>Mode Cloud (Vercel) Aktif</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        Karena Anda mengakses via Vercel, server tidak dapat mengakses disk lokal komputer Anda. File hasil generate akan otomatis diunduh sebagai satu paket <strong>ZIP</strong> langsung ke folder Downloads browser Anda.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      Karena Anda mengakses via Vercel, server tidak dapat mengakses disk lokal komputer Anda. File hasil generate akan otomatis diunduh sebagai satu paket <strong>ZIP</strong> langsung ke folder Downloads browser Anda.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={outputPath}
-                        onChange={(e) => setOutputPath(e.target.value)}
-                        placeholder="Contoh: ./elevenlabs_outputs atau C:\ElevenLabs_Outputs"
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-200 font-medium"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSelectFolder}
-                        disabled={selectingFolder}
-                        className="bg-slate-900 border border-slate-800 text-indigo-400 hover:text-indigo-300 font-bold px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {selectingFolder ? (
-                          <span>Membuka...</span>
-                        ) : (
-                          <>
-                            <span>📁</span>
-                            <span>Pilih Folder</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-slate-500">
-                      Mendukung relative path (misal: <code>./outputs</code> untuk menyimpan di dalam folder project ini) atau absolute path (misal: <code>C:\HasilAudio</code> untuk Windows, atau <code>/Users/nama/Downloads</code> untuk Mac/Linux). Anda juga dapat mengeklik tombol <strong>Pilih Folder</strong> untuk memilih secara visual di Windows.
-                    </p>
-                  </>
-                )}
-              </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={outputPath}
+                          onChange={(e) => setOutputPath(e.target.value)}
+                          placeholder="Contoh: ./elevenlabs_outputs atau C:\ElevenLabs_Outputs"
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-200 font-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSelectFolder}
+                          disabled={selectingFolder}
+                          className="bg-slate-900 border border-slate-800 text-indigo-400 hover:text-indigo-300 font-bold px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {selectingFolder ? (
+                            <span>Membuka...</span>
+                          ) : (
+                            <>
+                              <span>📁</span>
+                              <span>Pilih Folder</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Mendukung relative path (misal: <code>./outputs</code> untuk menyimpan di dalam folder project ini) atau absolute path (misal: <code>C:\HasilAudio</code> untuk Windows, atau <code>/Users/nama/Downloads</code> untuk Mac/Linux). Anda juga dapat mengeklik tombol <strong>Pilih Folder</strong> untuk memilih secara visual di Windows.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* API Key Override */}
               <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
@@ -1153,7 +1640,13 @@ export default function ElevenLabsBulkPage() {
                   Memproses Suara...
                 </>
               ) : (
-                <>🎙️ Generate Suara ({selectedVoiceIds.size})</>
+                <>
+                  🎙️ {generationMode === "single" 
+                    ? `Generate Suara (${selectedVoiceIds.size})` 
+                    : generationMode === "multi"
+                    ? `Generate Semua Perintah (${selectedVoiceIds.size} suara)`
+                    : `Generate Infer Filename (${selectedVoiceIds.size} suara)`}
+                </>
               )}
             </button>
           </div>
